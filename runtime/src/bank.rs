@@ -142,7 +142,7 @@ use {
     solana_hash::Hash,
     solana_inflation::Inflation,
     solana_keypair::Keypair,
-    solana_lattice_hash::lt_hash::LtHash,
+    solana_lattice_hash::lt_hash::{Checksum, LtHash},
     solana_measure::{measure::Measure, measure_time, measure_us},
     solana_message::{
         AccountKeys, SanitizedMessage, inner_instruction::InnerInstructions, v0::LoadedAddresses,
@@ -5683,6 +5683,11 @@ impl Bank {
     /// (cannot be made DCOU due to solana-program-test)
     pub fn set_capitalization_for_tests(&self, capitalization: u64) {
         self.capitalization.store(capitalization, Relaxed);
+    }
+
+    /// Returns the checksum of this bank's accounts lattice hash
+    pub fn accounts_lt_hash_checksum(&self) -> Checksum {
+        self.accounts_lt_hash.lock().unwrap().0.checksum()
     }
 
     /// Returns the `SnapshotHash` for this bank's slot

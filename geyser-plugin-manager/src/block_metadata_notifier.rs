@@ -1,5 +1,5 @@
 use {
-    crate::block_metadata_notifier_interface::BlockMetadataNotifier,
+    crate::block_metadata_notifier_interface::{BankHashes, BlockMetadataNotifier},
     agave_geyser_plugin_host::GeyserPluginHost,
     agave_geyser_plugin_interface::{
         geyser_plugin_interface::{ReplicaBlockInfoV5, ReplicaBlockInfoVersions},
@@ -31,6 +31,7 @@ impl BlockMetadataNotifier for BlockMetadataNotifierImpl {
         executed_transaction_count: u64,
         entry_count: u64,
         commission_rate_in_basis_points: bool,
+        bank_hashes: &BankHashes,
     ) {
         let plugin_manager = self.plugin_manager.load();
         if plugin_manager.plugins().next().is_none() {
@@ -60,6 +61,7 @@ impl BlockMetadataNotifier for BlockMetadataNotifierImpl {
             block_height,
             executed_transaction_count,
             entry_count,
+            bank_hashes,
         );
 
         for plugin in plugin_manager.plugins() {
@@ -125,6 +127,7 @@ impl BlockMetadataNotifierImpl {
         block_height: Option<u64>,
         executed_transaction_count: u64,
         entry_count: u64,
+        bank_hashes: &'a BankHashes,
     ) -> ReplicaBlockInfoV5<'a> {
         ReplicaBlockInfoV5 {
             parent_slot,
@@ -136,6 +139,11 @@ impl BlockMetadataNotifierImpl {
             block_height,
             executed_transaction_count,
             entry_count,
+            block_id: bank_hashes.block_id.as_ref(),
+            bank_hash: &bank_hashes.bank_hash,
+            parent_bank_hash: &bank_hashes.parent_bank_hash,
+            accounts_lt_hash_checksum: &bank_hashes.accounts_lt_hash_checksum,
+            signature_count: bank_hashes.signature_count,
         }
     }
 
@@ -155,12 +163,23 @@ mod tests {
         arc_swap::ArcSwap,
         libloading::Library,
         solana_accounts_db::stake_rewards::StakeRewardInfo,
+        solana_hash::Hash,
         solana_pubkey::Pubkey,
         solana_reward_info::RewardType,
         std::sync::{Arc, Mutex},
     };
 
-    type BlockMetadataUpdate = (u64, u64, u64, u64);
+    type BlockMetadataUpdate = (u64, u64, u64, u64, Option<Hash>, Hash, Hash, [u8; 32], u64);
+
+    fn test_bank_hashes() -> BankHashes {
+        BankHashes {
+            block_id: Some(Hash::new_from_array([1; 32])),
+            bank_hash: Hash::new_from_array([2; 32]),
+            parent_bank_hash: Hash::new_from_array([3; 32]),
+            accounts_lt_hash_checksum: [4; 32],
+            signature_count: 5,
+        }
+    }
 
     #[derive(Debug)]
     struct TestBlockMetadataPlugin {
@@ -185,6 +204,11 @@ mod tests {
                 bank_id,
                 blockinfo.executed_transaction_count,
                 blockinfo.entry_count,
+                blockinfo.block_id.copied(),
+                *blockinfo.bank_hash,
+                *blockinfo.parent_bank_hash,
+                *blockinfo.accounts_lt_hash_checksum,
+                blockinfo.signature_count,
             ));
             self.rewards_debug
                 .lock()
@@ -237,9 +261,23 @@ mod tests {
             7,
             3,
             false,
+            &test_bank_hashes(),
         );
 
-        assert_eq!(*updates.lock().unwrap(), vec![(42, 9, 7, 3)]);
+        assert_eq!(
+            *updates.lock().unwrap(),
+            vec![(
+                42,
+                9,
+                7,
+                3,
+                Some(Hash::new_from_array([1; 32])),
+                Hash::new_from_array([2; 32]),
+                Hash::new_from_array([3; 32]),
+                [4; 32],
+                5,
+            )]
+        );
     }
 
     #[test]
@@ -263,6 +301,7 @@ mod tests {
             0,
             0,
             false,
+            &test_bank_hashes(),
         );
 
         // A failing plugin first, a recording plugin second: the error is
@@ -316,6 +355,7 @@ mod tests {
             7,
             3,
             false,
+            &test_bank_hashes(),
         );
         notifier.notify_block_metadata(
             42,
@@ -329,6 +369,7 @@ mod tests {
             7,
             3,
             true,
+            &test_bank_hashes(),
         );
 
         let pk_s = pk.to_string();
