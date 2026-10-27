@@ -53,7 +53,9 @@ use {
     smallvec::SmallVec,
     solana_accounts_db::contains::Contains,
     solana_clock::{BankId, Slot},
-    solana_geyser_plugin_manager::block_metadata_notifier_interface::BlockMetadataNotifierArc,
+    solana_geyser_plugin_manager::block_metadata_notifier_interface::{
+        BankHashes, BlockMetadataNotifierArc,
+    },
     solana_gossip::cluster_info::ClusterInfo,
     solana_hash::Hash,
     solana_keypair::Keypair,
@@ -4281,6 +4283,13 @@ impl ReplayStage {
                         bank.executed_transaction_count(),
                         r_replay_progress.num_entries as u64,
                         commission_rate_in_basis_points,
+                        &BankHashes {
+                            block_id: bank.block_id(),
+                            bank_hash: bank.hash(),
+                            parent_bank_hash: bank.parent_hash(),
+                            accounts_lt_hash_checksum: bank.accounts_lt_hash_checksum().0,
+                            signature_count: bank.signature_count(),
+                        },
                     )
                 }
                 bank_complete_time.stop();

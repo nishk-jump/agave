@@ -1,6 +1,6 @@
 use {
     crate::{
-        block_metadata_notifier_interface::BlockMetadataNotifier,
+        block_metadata_notifier_interface::{BankHashes, BlockMetadataNotifier},
         geyser_plugin_manager::GeyserPluginManager,
     },
     agave_geyser_plugin_interface::geyser_plugin_interface::{
@@ -33,6 +33,7 @@ impl BlockMetadataNotifier for BlockMetadataNotifierImpl {
         executed_transaction_count: u64,
         entry_count: u64,
         commission_rate_in_basis_points: bool,
+        bank_hashes: &BankHashes,
     ) {
         let plugin_manager = self.plugin_manager.load();
         if plugin_manager.plugins.is_empty() {
@@ -50,6 +51,7 @@ impl BlockMetadataNotifier for BlockMetadataNotifierImpl {
             block_height,
             executed_transaction_count,
             entry_count,
+            bank_hashes,
         );
 
         for plugin in plugin_manager.plugins.iter() {
@@ -116,6 +118,7 @@ impl BlockMetadataNotifierImpl {
         block_height: Option<u64>,
         executed_transaction_count: u64,
         entry_count: u64,
+        bank_hashes: &'a BankHashes,
     ) -> ReplicaBlockInfoV4<'a> {
         ReplicaBlockInfoV4 {
             parent_slot,
@@ -127,6 +130,11 @@ impl BlockMetadataNotifierImpl {
             block_height,
             executed_transaction_count,
             entry_count,
+            block_id: bank_hashes.block_id.as_ref(),
+            bank_hash: &bank_hashes.bank_hash,
+            parent_bank_hash: &bank_hashes.parent_bank_hash,
+            accounts_lt_hash_checksum: &bank_hashes.accounts_lt_hash_checksum,
+            signature_count: bank_hashes.signature_count,
         }
     }
 
@@ -143,10 +151,21 @@ mod tests {
         agave_geyser_plugin_interface::geyser_plugin_interface::{GeyserPlugin, Result},
         arc_swap::ArcSwap,
         libloading::Library,
+        solana_hash::Hash,
         std::sync::{Arc, Mutex},
     };
 
     type BlockMetadataUpdate = (u64, BankId, u64, u64);
+
+    fn test_bank_hashes() -> BankHashes {
+        BankHashes {
+            block_id: Some(Hash::new_from_array([1; 32])),
+            bank_hash: Hash::new_from_array([2; 32]),
+            parent_bank_hash: Hash::new_from_array([3; 32]),
+            accounts_lt_hash_checksum: [4; 32],
+            signature_count: 5,
+        }
+    }
 
     #[derive(Debug)]
     struct TestBlockMetadataPlugin {
@@ -215,6 +234,7 @@ mod tests {
             7,
             3,
             false,
+            &test_bank_hashes(),
         );
 
         assert_eq!(*updates.lock().unwrap(), vec![(42, 9, 7, 3)]);

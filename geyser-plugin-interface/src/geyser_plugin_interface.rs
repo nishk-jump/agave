@@ -411,6 +411,13 @@ pub struct ReplicaBlockInfoV4<'a> {
     pub block_height: Option<u64>,
     pub executed_transaction_count: u64,
     pub entry_count: u64,
+    /// The block this bank replayed, when known.
+    pub block_id: Option<&'a Hash>,
+    pub bank_hash: &'a Hash,
+    pub parent_bank_hash: &'a Hash,
+    /// Checksum of the accounts lattice hash after this bank.
+    pub accounts_lt_hash_checksum: &'a [u8; 32],
+    pub signature_count: u64,
 }
 
 #[repr(u32)]

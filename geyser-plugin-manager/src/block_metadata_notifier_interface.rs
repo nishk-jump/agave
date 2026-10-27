@@ -1,5 +1,6 @@
 use {
     solana_clock::{BankId, UnixTimestamp},
+    solana_hash::Hash,
     solana_runtime::bank::KeyedRewardsAndNumPartitions,
     std::sync::Arc,
 };
@@ -21,7 +22,17 @@ pub trait BlockMetadataNotifier {
         executed_transaction_count: u64,
         entry_count: u64,
         commission_rate_in_basis_points: bool,
+        bank_hashes: &BankHashes,
     );
+}
+
+/// The hashes that identify a frozen bank's resulting state.
+pub struct BankHashes {
+    pub block_id: Option<Hash>,
+    pub bank_hash: Hash,
+    pub parent_bank_hash: Hash,
+    pub accounts_lt_hash_checksum: [u8; 32],
+    pub signature_count: u64,
 }
 
 pub type BlockMetadataNotifierArc = Arc<dyn BlockMetadataNotifier + Sync + Send>;
